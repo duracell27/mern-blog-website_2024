@@ -1,0 +1,13 @@
+POST http://localhost:3000/create-blog
+content-type: application/json
+authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY1OTcwMDAxNzE2MTA1OTQwNmE5NDAzNCIsImlhdCI6MTcwNDM5NDc1M30.okINfZKLW_v0G1pBSTRvlbbf7thorcx9_CE25uySiQ0
+
+{
+    "title": "sample title second version",
+    "banner": "https://example.com/imageurl",
+    "des": "few words about this blog",
+    "content" : {
+        "blocks": [1,2]
+    },
+    "tags": ["tag1", "tag2", "tag3", "tag4"]
+}
