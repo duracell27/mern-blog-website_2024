@@ -1,32 +1,34 @@
 import React, { useEffect, useState } from "react";
 import AnimationWrapper from "../common/page-animation";
-import InPageNavigation, { activeTabRef } from "../components/inpage-navigation.component";
+import InPageNavigation, {
+  activeTabRef,
+} from "../components/inpage-navigation.component";
 import axios from "axios";
 import Loader from "../components/loader.component";
 import BlogPostCard from "../components/blog-post.component";
 import MinimalBlogPostCard from "../components/nobanner-blog-post.component";
 import NoDataMessage from "../components/nodata.component";
 import { filterPaginationData } from "../common/filter-pagination-data";
+import LoadMoreDataBtn from "../components/load-more.component";
 
 const HomePage = () => {
   const [blogs, setBlogs] = useState(null);
   const [trendingBlogs, setTrendingBlogs] = useState(null);
   const [pageState, setPageState] = useState("home");
 
-  let categories = ["food", "trips", "mountains", "hiking", "dogs", 'tag1'];
+  let categories = ["food", "Галіпчак", "Робота", "Новий рік", "dogs", "tag1"];
 
-  const fetchLatestBlogs = (page=1) => {
+  const fetchLatestBlogs = ({ page = 1 }) => {
     axios
-      .post(import.meta.env.VITE_SERVER_URL + "/latest-blogs", {page})
-      .then(async({ data }) => {
-        console.log(data.blogs);
+      .post(import.meta.env.VITE_SERVER_URL + "/latest-blogs", { page })
+      .then(async ({ data }) => {
         let formatedData = await filterPaginationData({
           state: blogs,
           data: data.blogs,
           page,
-          countRoute: '/all-latest-blogs-count'
-        })
-console.log(formatedData)
+          countRoute: "/all-latest-blogs-count",
+        });
+
         setBlogs(formatedData);
       })
       .catch((err) => {
@@ -45,16 +47,27 @@ console.log(formatedData)
       });
   };
 
-  const fetchBlogsByCategory = () => {
+  const fetchBlogsByCategory = ({ page = 1 }) => {
     axios
-      .post(import.meta.env.VITE_SERVER_URL + "/search-blogs", {tag: pageState})
-      .then(({ data }) => {
-        setBlogs(data.blogs);
+      .post(import.meta.env.VITE_SERVER_URL + "/search-blogs", {
+        tag: pageState,
+        page,
+      })
+      .then(async ({ data }) => {
+        let formatedData = await filterPaginationData({
+          state: blogs,
+          data: data.blogs,
+          page,
+          countRoute: "/search-blogs-count",
+          data_to_send: { tag: pageState },
+        });
+
+        setBlogs(formatedData);
       })
       .catch((err) => {
         console.log(err);
       });
-  }
+  };
 
   const loadBlogByCategory = (e) => {
     let category = e.target.innerText.toLowerCase();
@@ -68,11 +81,11 @@ console.log(formatedData)
   };
 
   useEffect(() => {
-    activeTabRef.current.click()
+    activeTabRef.current.click();
     if (pageState === "home") {
-      fetchLatestBlogs();
-    }else{
-      fetchBlogsByCategory()
+      fetchLatestBlogs({ page: 1 });
+    } else {
+      fetchBlogsByCategory({ page: 1 });
     }
     if (!trendingBlogs) {
       fetchTrendingBlogs();
@@ -90,8 +103,7 @@ console.log(formatedData)
             <>
               {blogs === null ? (
                 <Loader />
-              ) : (
-                blogs.results.length ? 
+              ) : blogs.results.length ? (
                 blogs.results.map((blog, i) => (
                   <AnimationWrapper
                     key={i}
@@ -102,13 +114,20 @@ console.log(formatedData)
                       author={blog.author.personal_info}
                     />
                   </AnimationWrapper>
-                )): (<NoDataMessage message={'No blogs found'}/>)
-              )}{" "}
+                ))
+              ) : (
+                <NoDataMessage message={"No blogs found"} />
+              )}
+              <LoadMoreDataBtn
+                state={blogs}
+                fetchDataFun={
+                  pageState === "home" ? fetchLatestBlogs : fetchBlogsByCategory
+                }
+              />
             </>
             {trendingBlogs === null ? (
               <Loader />
-            ) : (
-              trendingBlogs.length ?
+            ) : trendingBlogs.length ? (
               trendingBlogs.map((blog, i) => (
                 <AnimationWrapper
                   key={i}
@@ -116,7 +135,9 @@ console.log(formatedData)
                 >
                   <MinimalBlogPostCard blog={blog} index={i} />
                 </AnimationWrapper>
-              )):(<NoDataMessage message={'No blogs found'}/>)
+              ))
+            ) : (
+              <NoDataMessage message={"No blogs found"} />
             )}
           </InPageNavigation>
         </div>
@@ -148,8 +169,7 @@ console.log(formatedData)
               </h1>
               {trendingBlogs === null ? (
                 <Loader />
-              ) : (
-                trendingBlogs.length?
+              ) : trendingBlogs.length ? (
                 trendingBlogs.map((blog, i) => (
                   <AnimationWrapper
                     key={i}
@@ -157,7 +177,9 @@ console.log(formatedData)
                   >
                     <MinimalBlogPostCard blog={blog} index={i} />
                   </AnimationWrapper>
-                )):(<NoDataMessage message={'No blogs found'}/>)
+                ))
+              ) : (
+                <NoDataMessage message={"No blogs found"} />
               )}
             </div>{" "}
           </div>
