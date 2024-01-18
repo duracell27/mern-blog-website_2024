@@ -97,8 +97,8 @@ const HomePage = () => {
         {/* latest blogs */}
         <div className="w-full">
           <InPageNavigation
-            routes={[pageState, "trending Blogs"]}
-            defaultHidden={["trending Blogs"]}
+            routes={[pageState, "Trending Blogs"]}
+            defaultHidden={["Trending Blogs"]}
           >
             <>
               {blogs === null ? (
