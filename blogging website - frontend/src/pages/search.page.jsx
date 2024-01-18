@@ -8,10 +8,12 @@ import NoDataMessage from "../components/nodata.component";
 import axios from "axios";
 import { filterPaginationData } from "../common/filter-pagination-data";
 import LoadMoreDataBtn from "../components/load-more.component";
+import UserCard from "../components/usercard.component";
 
 const SearchPage = () => {
   let { query } = useParams();
   const [blogs, setBlogs] = useState(null);
+  const [users, setUsers] = useState(null);
 
   const searchBlogs = ({ page = 1, create_new_array = false }) => {
     axios
@@ -32,15 +34,39 @@ const SearchPage = () => {
         console.log(err);
       });
   };
+  const fetchUsers = () => {
+    axios
+      .post(import.meta.env.VITE_SERVER_URL + "/search-users", { query })
+      .then(({ data: { users } }) => {
+        setUsers(users);
+      })
+      .catch((err) => {
+        console.log(err);
+      });
+  };
 
   useEffect(() => {
     resetState();
     searchBlogs({ page: 1, create_new_array: true });
+    fetchUsers()
   }, [query]);
 
   const resetState = () => {
     setBlogs(null);
-  };
+    setUsers(null);
+  }
+
+  const UserCardWrapper = ()=> {
+    return (
+      <>
+      {users === null ? <Loader/> : users.length ? users.map((user, i) =>(
+        <AnimationWrapper key={i} transition={{duration: 1 , delay: i*0.08}}>
+          <UserCard user={user}/>
+        </AnimationWrapper>
+      )):<NoDataMessage message={"No users found"}/>} 
+      </>
+    )
+  }
 
   return (
     <section className="h-cover flex justify-center gap-10">
@@ -70,7 +96,13 @@ const SearchPage = () => {
             )}
             <LoadMoreDataBtn state={blogs} fetchDataFun={searchBlogs} />
           </>
+
+          <UserCardWrapper/>
         </InPageNavigation>
+      </div>
+      <div className="min-w-[40%] lg:min-w-[350px] max-w-min border-l border-grey pl-8 pt-3 max-md:hidden">
+        <h1 className="font-medium text-xl mb-8">Users related to search <i className="mt-1 fi fi-rr-user"></i></h1>
+        <UserCardWrapper/>
       </div>
     </section>
   );
