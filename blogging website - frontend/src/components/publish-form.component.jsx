@@ -5,11 +5,12 @@ import { EditorContext } from "../pages/editor.pages";
 import Tag from "./tags.component";
 import axios from "axios";
 import { UserContext } from "../App";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
 const PublishForm = () => {
   let characterLimit = 200;
   let tagLimit = 10
+  let {blog_id} = useParams()
   let {
     blog: { banner, title, content, tags, des },
     setEditorState,
@@ -78,7 +79,7 @@ const PublishForm = () => {
       banner, des, content, tags, draft: false
     }
     
-    axios.post(import.meta.env.VITE_SERVER_URL + '/create-blog', blogObject, {headers:{
+    axios.post(import.meta.env.VITE_SERVER_URL + '/create-blog', {...blogObject, id: blog_id}, {headers:{
       "authorization": `Bearer ${access_token}`
     }}).then(()=>{
       e.target.classList.remove('disable')
