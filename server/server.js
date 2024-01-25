@@ -87,6 +87,47 @@ const generateUsername = async (email) => {
   return username;
 };
 
+const deleteComments = (_id) => {
+  Comment.findOneAndDelete({ _id }).then((comment) => {
+    if (comment.parent) {
+      Comment.findOneAndDelete(
+        { _id: comment.parent },
+        { $pull: { children: _id } }
+      )
+        .then((data) => console.log(data))
+        .catch((err) => console.log(err));
+    }
+    Notification.findOneAndDelete({ comment: _id })
+      .then((notification) => console.log("coment notify delited"))
+      .catch((err) => console.log(err));
+
+    Notification.findOneAndDelete({ reply: _id })
+      .then((notification) => {
+        console.log("reply notify delited");
+      })
+      .catch((err) => {
+        console.log(err);
+      });
+
+    Blog.findOneAndUpdate(
+      { _id: comment.blog_id },
+      {
+        $pull: { comments: _id },
+        $inc: {
+          "activity.total_comments": -1,
+          "activity.total_parent_comments": comment.parent ? 0 : -1,
+        },
+      }
+    ).then(blog=>{
+      if(comment.children.length){
+        comment.children.map(replies => {
+          deleteComments(replies)
+        })
+      }
+    })
+  }).catch(err => console.log(err ))
+};
+
 // upload image url
 
 server.get("/get-upload-url", (req, res) => {
@@ -554,69 +595,136 @@ server.post("/add-comment", verifyJWT, (req, res) => {
     commented_by: user_id,
   };
 
-  if(replying_to){
-    commentObject.parent = replying_to
+  if (replying_to) {
+    commentObject.parent = replying_to;
+    commentObject.isReply = true;
   }
 
   new Comment(commentObject)
     .save()
-    .then(async(commentFile) => {
+    .then(async (commentFile) => {
       let { comment, commentedAt, children } = commentFile;
 
       Blog.findOneAndUpdate(
         { _id },
         {
           $push: { comments: commentFile._id },
-          $inc: { "activity.total_comments": 1,"activity.total_parent_comments": replying_to? 0:1 },
-          
+          $inc: {
+            "activity.total_comments": 1,
+            "activity.total_parent_comments": replying_to ? 0 : 1,
+          },
         }
-      ).then(blog=>{
-        console.log('new comment created')
-      }).catch(err=>console.log(err));
+      )
+        .then((blog) => {
+          console.log("new comment created");
+        })
+        .catch((err) => console.log(err));
 
       let notificationObject = {
-        type: replying_to ?'reply': 'comment',
+        type: replying_to ? "reply" : "comment",
         blog: _id,
         notification_for: blog_author,
         user: user_id,
-        comment: commentFile._id
-      }
+        comment: commentFile._id,
+      };
 
-      if(replying_to){
-        notificationObject.replied_on_comment = replying_to
+      if (replying_to) {
+        notificationObject.replied_on_comment = replying_to;
 
-        await Comment.findOneAndUpdate({_id: replying_to}, {$push:{children: commentFile._id}}).then(replyingToCommentDoc=>{
-          notificationObject.notification_for = replyingToCommentDoc.commented_by
+        await Comment.findOneAndUpdate(
+          { _id: replying_to },
+          { $push: { children: commentFile._id } }
+        ).then((replyingToCommentDoc) => {
+          notificationObject.notification_for =
+            replyingToCommentDoc.commented_by;
         });
-
       }
 
-      new Notification(notificationObject).save().then(notification=>console.log('new notification created'))
-       return res.status(200).json({comment, commentedAt, _id: commentFile._id, user_id, children})
+      new Notification(notificationObject)
+        .save()
+        .then((notification) => console.log("new notification created"));
+      return res.status(200).json({
+        comment,
+        commentedAt,
+        _id: commentFile._id,
+        user_id,
+        children,
+      });
     })
     .catch((err) => {
       return res.status(500).json({ error: err.message });
     });
 });
 
-server.post('/get-blog-comments', (req, res) => {
-  let {blog_id, skip} = req.body
-  
-  let maxLimit = 5
+server.post("/get-blog-comments", (req, res) => {
+  let { blog_id, skip } = req.body;
 
-  Comment.find({blog_id, isReply:false})
-  .populate('commented_by', 'personal_info.username personal_info.fullname personal_info.profile_img')
-  .skip(skip)
-  .limit(maxLimit)
-  .sort({
-    'commentedAt': -1
-  })
-  .then(comment=>{
-    return res.status(200).json(comment)
-  }).catch(err=>{
-    return res.status(500).json({error: err.message})
-  })
-})
+  let maxLimit = 5;
+
+  Comment.find({ blog_id, isReply: false })
+    .populate(
+      "commented_by",
+      "personal_info.username personal_info.fullname personal_info.profile_img"
+    )
+    .skip(skip)
+    .limit(maxLimit)
+    .sort({
+      commentedAt: -1,
+    })
+    .then((comment) => {
+      return res.status(200).json(comment);
+    })
+    .catch((err) => {
+      return res.status(500).json({ error: err.message });
+    });
+});
+
+server.post("/get-replies", (req, res) => {
+  let { _id, skip } = req.body;
+  let maxLimit = 5;
+  Comment.findOne({ _id })
+    .populate({
+      path: "children",
+      option: {
+        limit: maxLimit,
+        skip: skip,
+        sort: {
+          commentedAt: -1,
+        },
+      },
+      populate: {
+        path: "commented_by",
+        select:
+          "personal_info.profile_img personal_info.username personal_info.fullname",
+      },
+      select: "-blog_id -updatedAt",
+    })
+    .select("children")
+    .then((doc) => {
+      return res.status(200).json({ replies: doc.children });
+    })
+    .catch((err) => {
+      return res.status(500).json({ error: err.message });
+    });
+});
+
+server.post("/delete-comment", verifyJWT, (req, res) => {
+  let user_id = req.user;
+  let { _id } = req.body;
+
+  Comment.findOne({ _id }).then((comment) => {
+    console.log('userid' , user_id)
+    console.log('comentedBy' , comment.commented_by)
+    console.log('compare' , user_id == comment.commented_by)
+    if (user_id == comment.commented_by || user_id == comment.blog_author) {
+      deleteComments(_id);
+
+      return res.status(200).json({ success: true });
+    } else {
+      return res.status(403).json({ error: "You can't delete this comment" });
+    }
+  });
+});
 
 server.listen(PORT, () => {
   console.log("listening on port ", PORT);
