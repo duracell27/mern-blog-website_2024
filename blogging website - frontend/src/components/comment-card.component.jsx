@@ -28,13 +28,13 @@ const CommentCard = ({ index, leftVal, commentData }) => {
     blog: {
       comments,
       activity,
-      activity:{total_parent_comments},
+      activity: { total_parent_comments },
       comments: { results: commentsArray },
       author: {
         personal_info: { username: blog_author },
       },
     },
-    setTotalParentCommentsLoaded
+    setTotalParentCommentsLoaded,
   } = useContext(BlogContext);
 
   const handleReplyClick = () => {
@@ -45,19 +45,21 @@ const CommentCard = ({ index, leftVal, commentData }) => {
   };
 
   const getParentIndex = () => {
-    let startingPoint = index -1
-    try{
-        while(commentsArray[startingPoint].childrenLevel >= commentData.childrenLevel){
-            startingPoint--
-        }
-    }catch{
-        startingPoint = undefined
+    let startingPoint = index - 1;
+    try {
+      while (
+        commentsArray[startingPoint].childrenLevel >= commentData.childrenLevel
+      ) {
+        startingPoint--;
+      }
+    } catch {
+      startingPoint = undefined;
     }
 
-    return startingPoint
-  }
+    return startingPoint;
+  };
 
-  const removeCommentsCards = (startingPoint, isDelete=false) => {
+  const removeCommentsCards = (startingPoint, isDelete = false) => {
     if (commentsArray[startingPoint]) {
       while (
         commentsArray[startingPoint].childrenLevel > commentData.childrenLevel
@@ -70,19 +72,30 @@ const CommentCard = ({ index, leftVal, commentData }) => {
     }
 
     if (isDelete) {
-        let parentIndex = getParentIndex()
-        if(parentIndex !== undefined){
-            commentsArray[parentIndex].children = commentsArray[parentIndex].children.filter(child => child !== _id)
-            if(!commentsArray[parentIndex].children.length){
-                commentsArray[parentIndex].isReplyLoaded = false
-            }
+      let parentIndex = getParentIndex();
+      if (parentIndex !== undefined) {
+        commentsArray[parentIndex].children = commentsArray[
+          parentIndex
+        ].children.filter((child) => child !== _id);
+        if (!commentsArray[parentIndex].children.length) {
+          commentsArray[parentIndex].isReplyLoaded = false;
         }
-        commentsArray.splice(index, 1);
+      }
+      commentsArray.splice(index, 1);
     }
-    if(commentData.childrenLevel === 0 && isDelete){
-        setTotalParentCommentsLoaded(prev => prev-1)
+    if (commentData.childrenLevel === 0 && isDelete) {
+      setTotalParentCommentsLoaded((prev) => prev - 1);
     }
-    setBlog({ ...blog, comments: { results: commentsArray }, activity: {...activity, total_parent_comments: total_parent_comments - (commentData.childrenLevel === 0  && isDelete? 1:0)} });
+    setBlog({
+      ...blog,
+      comments: { results: commentsArray },
+      activity: {
+        ...activity,
+        total_parent_comments:
+          total_parent_comments -
+          (commentData.childrenLevel === 0 && isDelete ? 1 : 0),
+      },
+    });
   };
 
   const hideReplies = () => {
@@ -93,25 +106,38 @@ const CommentCard = ({ index, leftVal, commentData }) => {
   const deleteComment = (e) => {
     e.target.setAttribute("disabled", true);
 
-    axios.post(import.meta.env.VITE_SERVER_URL + "/delete-comment",{_id},{headers:{
-        Authorization: `Bearer ${access_token}`
-    }}).then(()=>{
-        e.target.removeAttribute('disabled')
-        removeCommentsCards(index+1, true)
-    }).catch(err=>console.log(err))
+    axios
+      .post(
+        import.meta.env.VITE_SERVER_URL + "/delete-comment",
+        { _id },
+        {
+          headers: {
+            Authorization: `Bearer ${access_token}`,
+          },
+        }
+      )
+      .then(() => {
+        e.target.removeAttribute("disabled");
+        removeCommentsCards(index + 1, true);
+      })
+      .catch((err) => console.log(err));
   };
 
-  const loadReplies = ({ skip = 0 }) => {
-    if (children.length) {
+  const loadReplies = ({ skip = 0, currentIndex = index }) => {
+    if (commentsArray[currentIndex].children.length) {
       hideReplies();
       axios
-        .post(import.meta.env.VITE_SERVER_URL + "/get-replies", { _id, skip })
+        .post(import.meta.env.VITE_SERVER_URL + "/get-replies", {
+          _id: commentsArray[currentIndex]._id,
+          skip,
+        })
         .then(({ data: { replies } }) => {
-          commentData.isReplyLoaded = true;
+          commentsArray[currentIndex].isReplyLoaded = true;
           for (let i = 0; i < replies.length; i++) {
-            replies[i].childrenLevel = commentData.childrenLevel + 1;
+            replies[i].childrenLevel =
+              commentsArray[currentIndex].childrenLevel + 1;
 
-            commentsArray.splice(index + 1 + i + skip, 0, replies[i]);
+            commentsArray.splice(currentIndex + 1 + i + skip, 0, replies[i]);
           }
 
           setBlog({
@@ -122,6 +148,43 @@ const CommentCard = ({ index, leftVal, commentData }) => {
         .catch((error) => {
           console.log(error);
         });
+    }
+  };
+
+  const LoadMoreRepliesButton = () => {
+    let button = <button
+    onClick={() =>
+      loadReplies({
+        skip: index - parentIndex,
+        currentIndex: parentIndex,
+      })
+    }
+    className="text-dark-grey p-2 px-3 hover:bg-grey/30 rounded-md flex items-center gap-2"
+  >
+    Load more replies
+  </button>
+
+    let parentIndex = getParentIndex();
+
+    if (commentsArray[index + 1]) {
+      console.log('я в першому іф')
+      if (
+        commentsArray[index + 1].childrenLevel <
+        commentsArray[index].childrenLevel
+      ) {
+        if ((index - parentIndex) < commentsArray[parentIndex].children.length) {
+          return button
+        }
+      }
+    } else {
+      console.log('я в другому іф')
+      console.log('парент індекс', parentIndex)
+      if (parentIndex !==undefined) {
+        console.log('парент індекс є')
+        if ((index - parentIndex) < commentsArray[parentIndex].children.length) {
+          return button
+        }
+      }
     }
   };
   return (
@@ -184,6 +247,7 @@ const CommentCard = ({ index, leftVal, commentData }) => {
           ""
         )}
       </div>
+      <LoadMoreRepliesButton />
     </div>
   );
 };
