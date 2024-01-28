@@ -88,44 +88,44 @@ const generateUsername = async (email) => {
 };
 
 const deleteComments = (_id) => {
-  Comment.findOneAndDelete({ _id }).then((comment) => {
-    if (comment.parent) {
-      Comment.findOneAndDelete(
-        { _id: comment.parent },
-        { $pull: { children: _id } }
-      )
-        .then((data) => console.log(data))
+  Comment.findOneAndDelete({ _id })
+    .then((comment) => {
+      if (comment.parent) {
+        Comment.findOneAndDelete(
+          { _id: comment.parent },
+          { $pull: { children: _id } }
+        )
+          .then((data) => console.log(data))
+          .catch((err) => console.log(err));
+      }
+      Notification.findOneAndDelete({ comment: _id })
+        .then((notification) => {})
         .catch((err) => console.log(err));
-    }
-    Notification.findOneAndDelete({ comment: _id })
-      .then((notification) => console.log("coment notify delited"))
-      .catch((err) => console.log(err));
 
-    Notification.findOneAndDelete({ reply: _id })
-      .then((notification) => {
-        console.log("reply notify delited");
-      })
-      .catch((err) => {
-        console.log(err);
+      Notification.findOneAndDelete({ reply: _id })
+        .then((notification) => {})
+        .catch((err) => {
+          console.log(err);
+        });
+
+      Blog.findOneAndUpdate(
+        { _id: comment.blog_id },
+        {
+          $pull: { comments: _id },
+          $inc: {
+            "activity.total_comments": -1,
+            "activity.total_parent_comments": comment.parent ? 0 : -1,
+          },
+        }
+      ).then((blog) => {
+        if (comment.children.length) {
+          comment.children.map((replies) => {
+            deleteComments(replies);
+          });
+        }
       });
-
-    Blog.findOneAndUpdate(
-      { _id: comment.blog_id },
-      {
-        $pull: { comments: _id },
-        $inc: {
-          "activity.total_comments": -1,
-          "activity.total_parent_comments": comment.parent ? 0 : -1,
-        },
-      }
-    ).then(blog=>{
-      if(comment.children.length){
-        comment.children.map(replies => {
-          deleteComments(replies)
-        })
-      }
     })
-  }).catch(err => console.log(err ))
+    .catch((err) => console.log(err));
 };
 
 // upload image url
@@ -134,7 +134,6 @@ server.get("/get-upload-url", (req, res) => {
   generateUploadURL()
     .then((url) => res.status(200).json({ uploadURL: url }))
     .catch((error) => {
-      console.log(error.message);
       return res.status(500).json({ error: error.message });
     });
 });
@@ -269,6 +268,143 @@ server.post("/google-auth", async (req, res) => {
     .catch((err) =>
       res.status(500).json({ error: "Filed to authenticate with google" })
     );
+});
+
+server.post("/change-password", verifyJWT, (req, res) => {
+  let { currentPassword, newPassword } = req.body;
+
+  if (
+    !passwordRegex.test(currentPassword) ||
+    !passwordRegex.test(newPassword)
+  ) {
+    return res.status(403).json({
+      error:
+        "Password should be 6 to 20 characters long, 1 numeric, 1 lowercase and 1 uppercase letters",
+    });
+  }
+
+  User.findOne({ _id: req.user })
+    .then((user) => {
+      if (user.google_auth) {
+        return res
+          .status(403)
+          .json({
+            error: "You can`t change your password if you login with Google",
+          });
+      }
+      bcrypt.compare(
+        currentPassword,
+        user.personal_info.password,
+        (err, result) => {
+          if (err) {
+            return res
+              .status(500)
+              .json({
+                error:
+                  "Some error occurred while trying to change your password",
+              });
+          }
+
+          if (!result) {
+            return res
+              .status(403)
+              .json({ error: "Incorrect current password" });
+          }
+
+          bcrypt.hash(newPassword, 10, async (error, hashed_password) => {
+            User.findOneAndUpdate(
+              { _id: req.user },
+              { "personal_info.password": hashed_password }
+            )
+              .then((u) => {
+                return res.status(200).json({ status: "passwor changed" });
+              })
+              .catch((err) =>
+                res
+                  .status(500)
+                  .json({
+                    error:
+                      "Something happened while updating password, try again later",
+                  })
+              );
+          });
+        }
+      );
+    })
+    .catch((err) => {
+      return res.status(500).json({ error: "User not found" });
+    });
+});
+
+server.post("/update-profile-img", verifyJWT, (req, res) => {
+  let { url } = req.body;
+
+  User.findOneAndUpdate({ _id: req.user }, { "personal_info.profile_img": url })
+    .then(() => {
+      return res.status(200).json({ profile_img: url });
+    })
+    .catch((err) => {
+      return res.status(500).json({ error: err.message });
+    });
+});
+
+server.post("/update-profile", verifyJWT, (req, res) => {
+  let { username, bio, social_links } = req.body;
+
+  let bioLimit = 150;
+
+  if (username.length < 3) {
+    return res
+      .status(403)
+      .json({ error: "Username should be at least 3 characters long" });
+  }
+  if (bio.length > bioLimit) {
+    return res
+      .status(403)
+      .json({ error: "Bio should be less than 150 characters long" });
+  }
+  let social_linksArray = Object.keys(social_links);
+
+  try {
+    for (let i = 0; i < social_linksArray.length; i++) {
+      if (social_links[social_linksArray[i]].length) {
+        let hostName = new URL(social_links[social_linksArray[i]]).hostname;
+        if (
+          !hostName.includes(`${social_linksArray[i]}.com`) &&
+          social_linksArray[i] != "website"
+        ) {
+          return res
+            .status(403)
+            .json({
+              error: `Social link ${social_linksArray[i]} is invalid. Enter a full link name`,
+            });
+        }
+      }
+    }
+  } catch (err) {
+    return res
+      .status(500)
+      .json({
+        error: "You must provide full social links with http(s) included",
+      });
+  }
+
+  let updateObject = {
+    "personal_info.username": username,
+    "personal_info.bio": bio,
+    social_links,
+  };
+
+  User.findOneAndUpdate({ _id: req.user }, updateObject, {
+    runValidators: true
+  }).then(()=>{
+    return res.status(200).json({username });
+  }).catch(err => {
+    if(err.code === 110000){
+      return res.status(500).json({error: 'Username is already taken'});
+    }
+    return res.status(500).json({error: err.message});
+  })
 });
 
 server.post("/latest-blogs", (req, res) => {
@@ -525,7 +661,6 @@ server.post("/get-blog", (req, res) => {
 });
 
 server.post("/like-blog", verifyJWT, (req, res) => {
-  console.log("userid", req.user);
   let user_id = req.user;
   let { _id, isLikedByUser } = req.body;
   let incrementValue = !isLikedByUser ? 1 : -1;
@@ -615,9 +750,7 @@ server.post("/add-comment", verifyJWT, (req, res) => {
           },
         }
       )
-        .then((blog) => {
-          console.log("new comment created");
-        })
+        .then((blog) => {})
         .catch((err) => console.log(err));
 
       let notificationObject = {
@@ -713,9 +846,6 @@ server.post("/delete-comment", verifyJWT, (req, res) => {
   let { _id } = req.body;
 
   Comment.findOne({ _id }).then((comment) => {
-    console.log('userid' , user_id)
-    console.log('comentedBy' , comment.commented_by)
-    console.log('compare' , user_id == comment.commented_by)
     if (user_id == comment.commented_by || user_id == comment.blog_author) {
       deleteComments(_id);
 

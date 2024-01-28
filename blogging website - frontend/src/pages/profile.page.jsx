@@ -120,13 +120,13 @@ const ProfilePage = () => {
             <h1 className="text-2xl font-medium">@{profile_username}</h1>
             <p className="text-xl capitalize h-6">{fullname}</p>
             <p>
-              {total_posts.toLocaleString()} Blogs -{" "}
-              {total_reads.toLocaleString()} Reads
+              <strong>{total_posts.toLocaleString()}</strong> Blogs -{" "}
+              <strong>{total_reads.toLocaleString()}</strong> Reads
             </p>
             <div className="flex gap-4 mt-2">
               {profileId === username ? (
                 <Link
-                  to={`/setting/edit-profile`}
+                  to={`/settings/edit-profile`}
                   className="btn-light rounded-md"
                 >
                   Edit Profile

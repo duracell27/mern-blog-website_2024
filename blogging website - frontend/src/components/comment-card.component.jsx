@@ -167,7 +167,7 @@ const CommentCard = ({ index, leftVal, commentData }) => {
     let parentIndex = getParentIndex();
 
     if (commentsArray[index + 1]) {
-      console.log('я в першому іф')
+    
       if (
         commentsArray[index + 1].childrenLevel <
         commentsArray[index].childrenLevel
@@ -177,10 +177,9 @@ const CommentCard = ({ index, leftVal, commentData }) => {
         }
       }
     } else {
-      console.log('я в другому іф')
-      console.log('парент індекс', parentIndex)
+      
       if (parentIndex !==undefined) {
-        console.log('парент індекс є')
+    
         if ((index - parentIndex) < commentsArray[parentIndex].children.length) {
           return button
         }
