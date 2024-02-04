@@ -41,7 +41,7 @@ const Notifications = () => {
           user: access_token,
         });
         setNotifications(formatedData);
-        console.log(formatedData);
+        
       })
       .catch((err) => {
         console.log(err);

@@ -20,7 +20,7 @@ const Navbar = () => {
     setUserAuth,
   } = useContext(UserContext);
 
-  // console.log(userAuth)
+  
   const handleBlur = () => {
     setTimeout(() => {
       setUserNavPanel(false);

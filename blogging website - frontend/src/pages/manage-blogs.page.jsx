@@ -44,8 +44,6 @@ const ManageBlogs = () => {
           data_to_send: { draft, query },
         });
 
-        console.log(formattedData)
-
         if (draft) {
           setDrafts(formattedData);
         } else {
