@@ -83,7 +83,7 @@ const Navbar = () => {
             <i className="fi fi-rr-search text-2xl"></i>
           </button>
           <button
-            className="md:hidden bg-grey w-12 h-12 rounded-full flex items-center justify-center"
+            className=" bg-grey w-12 h-12 rounded-full flex items-center justify-center"
             type="button"
             onClick={changeTheme}
           >
